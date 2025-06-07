@@ -9,7 +9,7 @@ This script:
 4. Compares effects of Trial Difficulty vs Stimulus Type
 5. Includes convergence diagnostics and posterior visualization
 """
-#Utilized Claude throughout to troubleshoot any problems/errors I ran into
+#Used Claude to help troubleshoot any errors/problems 
 
 import numpy as np
 import pymc as pm
@@ -211,7 +211,7 @@ def analyze_individual_differences(trace, data):
     return d_prime_mean, criterion_mean
 
 def create_delta_plots_for_all_participants(data, max_participants=5):
-    """Generate delta plots for multiple participants"""
+    """Generate delta plots for multiple participants with correct output location"""
     print("=== Generating Delta Plots ===")
     
     # Prepare data for delta plots
@@ -222,9 +222,57 @@ def create_delta_plots_for_all_participants(data, max_participants=5):
     
     print(f"Creating delta plots for {min(len(participants), max_participants)} participants...")
     
+    # Create our own delta plot output directory in the correct location
+    delta_output_dir = Path('../output')
+    os.makedirs(delta_output_dir, exist_ok=True)
+    
     for i, pnum in enumerate(participants[:max_participants]):
         print(f"  Generating delta plot for participant {pnum}")
-        draw_delta_plots(delta_data, pnum)
+        
+        # Call the original function but intercept where it saves
+        # We'll use matplotlib to save to our desired location instead
+        try:
+            # Call the function to generate the plot
+            draw_delta_plots(delta_data, pnum)
+            
+            # The function creates the plot, so now we need to save it to our location
+            # Get the current figure and save it where we want
+            current_fig = plt.gcf()
+            if current_fig:
+                output_path = delta_output_dir / f'delta_plots_{pnum}.png'
+                current_fig.savefig(output_path, dpi=300, bbox_inches='tight')
+                print(f"    ✅ Delta plot saved to: {output_path}")
+                plt.close(current_fig)  # Close to free memory
+            else:
+                print(f"    ⚠️  No figure found for participant {pnum}")
+                
+        except Exception as e:
+            print(f"    ❌ Error generating delta plot for participant {pnum}: {e}")
+    
+    # Clean up any delta plots that might have been saved in wrong locations
+    wrong_locations = [
+        Path('../../output'),
+        Path('../../../output'),
+        Path('output')
+    ]
+    
+    print(f"\nCleaning up delta plots from incorrect locations...")
+    for wrong_location in wrong_locations:
+        if wrong_location.exists():
+            delta_files = list(wrong_location.glob('delta_plots_*.png'))
+            for file in delta_files:
+                try:
+                    # Move to correct location
+                    correct_location = delta_output_dir / file.name
+                    if not correct_location.exists():
+                        import shutil
+                        shutil.move(str(file), str(correct_location))
+                        print(f"    Moved {file.name} to correct location")
+                    else:
+                        file.unlink()  # Delete duplicate
+                        print(f"    Removed duplicate {file.name}")
+                except Exception as e:
+                    print(f"    Could not move {file.name}: {e}")
     
     return delta_data
 
